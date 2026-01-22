@@ -1,0 +1,13 @@
+body {
+    display: flex;
+    justify-content: center;   /* vodorovné zarovnání */
+    align-items: center;       /* svislé zarovnání */
+    height: 100vh;             /* výška celé obrazovky */
+    margin: 0;
+    text-align: center;        /* zarovná text uvnitř */
+}
+
+.container {
+    width: 100%;
+    max-width: 400px;          /* aby to nebylo přes celou šířku */
+}

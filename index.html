@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Počasí - Docker Demo</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <h1>🌤️ Počasí</h1>
+    <div class="search-box">
+      <input id="city" type="text" placeholder="Zadejte město (např. Praha)" />
+      <button onclick="search()">Hledat</button>
+    </div>
+    <div id="result"></div>
+  </div>
+
+  <script>
+    // Try multiple endpoints to support Windows host and Docker containers.
+    const apiCandidates = [
+      // If frontend is proxied to backend, relative path works
+      (city) => `/weather/${encodeURIComponent(city)}`,
+      // Docker Desktop containers can reach host via host.docker.internal
+      (city) => `http://host.docker.internal:8000/weather/${encodeURIComponent(city)}`,
+      // Localhost on host machine (when running backend locally)
+      (city) => `http://localhost:8000/weather/${encodeURIComponent(city)}`,
+    ];
+
+    async function tryFetch(url){
+      try{
+        const res = await fetch(url, { mode: 'cors' });
+        if(!res.ok) return { ok: false, status: res.status, text: await res.text() };
+        const json = await res.json();
+        return { ok: true, data: json };
+      }catch(e){
+        return { ok: false, error: e };
+      }
+    }
+
+    async function search(){
+      const city = document.getElementById('city').value.trim();
+      if(!city) return alert('Zadejte město');
+      const resultEl = document.getElementById('result');
+      resultEl.innerHTML = '<div class="loading">⏳ Načítám...</div>';
+
+      for(const candidate of apiCandidates){
+        const url = candidate(city);
+        const resp = await tryFetch(url);
+        if(resp.ok){
+          renderWeather(resp.data, resultEl);
+          return;
+        }
+      }
+
+      resultEl.innerHTML = '<div class="error">❌ Nelze se připojit k API. Zkontrolujte, že běží backend na portu 8000 nebo Docker Desktop je spuštěný.</div>';
+    }
+
+    function renderWeather(data, container){
+      const c = data || {};
+      const city = c.city || '—';
+      const desc = c.description || '—';
+      const temp = (c.temperature !== undefined && c.temperature !== null) ? Math.round(c.temperature) + '°C' : '—';
+      const feels = (c.feels_like !== undefined && c.feels_like !== null) ? Math.round(c.feels_like) + '°C' : '—';
+      const humidity = c.humidity !== undefined ? c.humidity + '%' : '—';
+      const pressure = c.pressure !== undefined ? c.pressure + ' hPa' : '—';
+      const wind = c.wind_speed !== undefined ? c.wind_speed + ' m/s' : '—';
+
+      const icon = iconForDescription(desc);
+      container.innerHTML = `
+        <div class="weather-card">
+          <div>
+            <span class="icon">${icon}</span>
+            <h2>${escapeHtml(city)}</h2>
+          </div>
+          <div class="description">${escapeHtml(desc)}</div>
+          <div class="weather-metrics">
+            <div class="metric">
+              <div class="metric-label">Teplota</div>
+              <div class="metric-value">${escapeHtml(temp)}</div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">Pocitová</div>
+              <div class="metric-value">${escapeHtml(feels)}</div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">Vlhkost</div>
+              <div class="metric-value">${escapeHtml(humidity)}</div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">Tlak</div>
+              <div class="metric-value">${escapeHtml(pressure)}</div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">Vítr</div>
+              <div class="metric-value">${escapeHtml(wind)}</div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function escapeHtml(str){
+      if(str === null || str === undefined) return '';
+      return String(str).replace(/[&<>"']/g, function(s){
+        return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"})[s];
+      });
+    }
+
+    function iconForDescription(desc){
+      if(!desc) return '❓';
+      const d = desc.toLowerCase();
+      if(d.includes('clear') || d.includes('sun')) return '☀️';
+      if(d.includes('partly') || d.includes('few') || d.includes('mostly')) return '🌤️';
+      if(d.includes('cloud')) return '☁️';
+      if(d.includes('rain') || d.includes('drizzle')) return '🌧️';
+      if(d.includes('snow')) return '❄️';
+      if(d.includes('thunder') || d.includes('storm')) return '⛈️';
+      if(d.includes('fog') || d.includes('mist') || d.includes('haze')) return '🌫️';
+      return '🌡️';
+    }
+  </script>
+</body>
+</html>
